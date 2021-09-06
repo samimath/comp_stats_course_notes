@@ -1,0 +1,331 @@
+---
+title: "Parameter estimation for linear regression"
+#subtitle: "Math 575 lecture 2"
+author: "Sami Cheong"
+date: "9/6/2021"
+output: 
+  html_document:
+      toc: true
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library('readxl')
+library('rio')
+library('kableExtra')
+library('plot3D')
+
+```
+
+## Goal of this review 
+
+- Show a simple example of building a linear model using example data from US Census bureau
+- Illustrates the results of different parameter estimation techniques 
+
+### First, a little background
+
+The US government is a great resource for data collected from and paid for by taxpayers (that's us!). One particularly good place is the census bureau, which has been tracking many aspects of the American lives. In this example, let us take a look at the Manufactured Housing Survey. From their website:
+
+```
+The Manufactured Housing Survey (MHS) is sponsored by the Department of Housing and Urban Development and collected by the Census Bureau, and provides data on shipments, prices and characteristics of new manufactured housing. Manufactured Housing statistics at a glance.
+
+```
+
+```{r, echo=FALSE}
+# Define variable containing url
+url <- "https://www.census.gov/content/census/en/programs-surveys/mhs/_jcr_content/herotextimage.texthero.jpg/1560197216850.jpg"
+```
+
+<center><img src="`r url`"></center>
+
+
+### Check out the data source
+
+We can find public datasets from the MHS program in [this link](https://www.census.gov/programs-surveys/mhs/data/datasets.html) hosted by the US census bureau. For this example, we look the public data set for the 2019 MHS program which contains in total 22 attributes and 4916 observations. Note that the website also included documentation about how the data is collected, and a descriptions of their variables (see below). 
+
+
+```{r, echo=FALSE}
+
+#url <- 'https://www.census.gov/content/dam/Census/programs-surveys/mhs/technical-documentation/puf/MHS_PUF_Documentation2019.docx'
+mhs.table <- read.csv('mhs_meta_data.csv', header = TRUE,check.names = FALSE)
+
+mhs.table %>% 
+  kable %>%
+  kable_styling("striped", full_width = F,position = "center") %>% 
+ scroll_box(width = "1000px", height = "500px")
+```
+
+
+### Now let's get some data
+The website provides data in `.xlsx` format. A little googling shows that the package [rio](https://github.com/leeper/rio) is a good choice for this, so let us go ahead and read in the data, and take a quick glimpse at it:
+
+```{r}
+
+## census regions:
+## 1. = Northeast, 2.  = Midwest,  3.  South, 4. West, 5. National
+
+url <- 'https://www2.census.gov/programs-surveys/mhs/tables/2014/PUF2019.xlsx'
+mhs.data<-rio::import(url)
+
+head(mhs.data) %>% 
+  kable %>%
+  kable_styling("striped", full_width = F,position = "center") %>% 
+ scroll_box(width = "1000px", height = "200px")
+
+```
+
+
+
+### Some light data filtering
+
+For this example, we will take a look at how price changes as a function of square footage in manufactured houses across the midwest region (census code #2). Notice that we are only interested in reported data (rather than imputed ones) for now. This is how we can subset the data set:
+
+```{r}
+
+## let's look at midwest, and select records where the price and sqft values are reported rather than imputed
+mhs.midwest <- mhs.data[(mhs.data$REGION==2 & mhs.data$JPRICE =='R'& mhs.data$JSQFT =='R'),]
+
+head(mhs.midwest) %>% 
+  kable %>%
+  kable_styling("striped", full_width = F,position = "center") %>% 
+ scroll_box(width = "1000px", height = "200px")
+```
+
+
+
+
+
+### Taking a look at what we have so far
+
+As an initial data exploration, it is useful to visualize them to see if we can spot any potential data issues:
+
+```{r,fig.width=10}
+
+par(mfrow = c(1,3))
+hist(mhs.midwest$PRICE,breaks=30,border = 'grey',col='gold',main = 'Distribution of Price')
+hist(mhs.midwest$SQFT,breaks=30,border = 'grey',col='blue', main = 'Distribution of SQFT')
+plot(mhs.midwest$SQFT,mhs.midwest$PRICE,col='forestgreen', main = 'SQFT vs Price')
+
+```
+
+
+### Fitting data with a linear model
+We would like to express the pricing information from the MHS data with the following model:
+
+\[\text{Price} = \beta_0 + \beta_1 \text{Sqft} + \epsilon\]
+
+there are three parameters of interest : $\beta_0, \beta_1$ and $\sigma^2$ (which comes from the assumption that $\epsilon \sim N(0,\sigma^2)$).
+
+The R package `lm` is a versatile tool when it comes to fitting linear models. Let's use it as a first pass to see how we can characterize the relationship between house prices and their square footage:
+
+
+```{r}
+midwest.lm <-lm(data = mhs.midwest, formula = PRICE~SQFT)
+
+lm.coef<-midwest.lm$coefficients
+
+midwest.fiitted <- lm.coef[1] + lm.coef[2]*mhs.midwest$SQFT
+
+print(summary(midwest.lm))
+
+```
+
+
+Overall the model seems to have explained about 57% of the variation in the data. Clearly there is room for improvement, but it is not the worst based on how simple our model is. In any case, we are currently more interested in how the parameters $\beta_0, \beta_1$ and $\sigma^2$ are derived rather than finding the perfect model.
+
+
+Let's take a look at how the model fit against the data:
+
+```{r}
+
+plot(x=mhs.midwest$SQFT, y=mhs.midwest$PRICE,
+     xlab="Sqft",
+     ylab="Price",col='darkgrey')
+abline(a=lm.coef[1],b=lm.coef[2],col="forestgreen")
+
+
+```
+
+### MLE approach for estimating unknown parameters
+
+
+To understand how MLE works, we first need to understand what is the parametric assumption of the data we are modeling. In this case, we are interested in using linear regression model to fit the observation $Y = \text{PRICE}$ with data $X = \text{SQFT}.$ By using linear regression we have accepted the assumption that $Y$ is a normally distributed random variable with mean = $\beta_0 + \beta_1X$ and variance = $\sigma^2$.
+
+Let $\theta = (\beta_0,\beta_1,\sigma^2)$, The density function for $Y$ is
+\[f(y;\theta) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\{-(y-(\beta_0+\beta_1x)^2/2\sigma^2\} = L(\theta)\]
+
+
+This translates to a log-likelihood function expressed as : 
+\[l(\theta) = \log(L(\theta))  = -\frac{1}{2}\large[ n\log(2\pi) + \log(\sigma^2) +\sum_{i=1}^{n}\large((y_i - \beta_0 - \beta_1 x_i\large)^2/2\sigma^2)\large]\]
+
+
+Now we have a multi-variate optimization problem where we are interested in finding the tuple of $(\beta_0,\beta_1,\sigma^2)$ that maximizies $l(\theta)$ (or minimize $-l(\theta)$). Let's see how to do that in R:
+
+First, put data in matrix form and calculate some constant terms for later use:
+
+```{r}
+# First, put the data into matrices for the MLE procedure
+
+# design matrix
+x <- cbind(1,as.matrix(mhs.midwest$SQFT))
+
+# observation
+y <- as.matrix(mhs.midwest$PRICE)
+
+# rank of matrix
+K <- ncol(x)
+
+# dimension of theta
+K1 <- K + 1
+
+# number of observations
+n <- nrow(x)
+
+```
+
+
+### Define the function to be optimized 
+
+Note, here the quadratic form $(y_i - \beta_0 -\beta_1x_i)^2 $ is equivalent to $(y-X\beta)^2$, where $\beta = [\beta_0,\beta_1]^T $
+
+```{r}
+
+
+log.lik.lm <- function(theta,X,Y) {
+  #preset values for X, Y based on x and y defined from the data
+  Y <- as.vector(y)
+  
+  X <- as.matrix(x)
+  
+  xbeta <- X%*%theta[1:K]
+  # write it this way so it's generealizable for higher dimension
+  Sig <- theta[K1:K1]
+  
+  sum(-(1/2)*log(2*pi)-(1/2)*log(Sig^2)-(1/(2*Sig^2))*(y-xbeta)^2)
+  
+}
+
+
+```
+
+
+We can evaluate $l(\theta)$ with the values we got from `lm`:
+
+```{r}
+log.lik.lm(theta = c(lm.coef[1],lm.coef[2],sigma(midwest.lm)))
+
+
+```
+
+We can also take a look at how the likelihood changes if we vary one of the parameter (say $\beta_0$, or $\beta_1$)
+
+
+```{r,fig.width=10,fig.align='center'}
+
+b0_list <- -20000:-5000
+b1_list <-30:100
+l_test <-lapply(b1_list,
+                function(b){log.lik.lm(theta=c(lm.coef[1],b,sigma(midwest.lm)))})
+
+
+l_test2 <-lapply(b0_list, function(b){log.lik.lm(theta=c(b,lm.coef[2],sigma(midwest.lm)))})
+
+par(mfrow=c(1,2))
+
+plot(b0_list,l_test2, type='l',col = 'purple',main = 'll as a function b0')
+plot(b1_list,l_test, type='l',col ='orange',main = 'll as a function b1')
+
+```
+
+
+
+Or, we can find the set of $\theta$ values that maximizes the likelihood function (or the log-likelihood). From the graphs above, we can get a sense f a good set of initial values to start. One way to solve for the multivariate optimization is using the `optim` package in R:
+
+
+```{r}
+
+midwest.mle <- optim(par=c(-10000,60,100),fn=log.lik.lm, 
+                     method='L-BFGS-B',
+               control = list(trace=0,maxit=1000,fnscale = -1),
+               hessian = TRUE)
+
+mle.coef <-midwest.mle$par
+
+
+
+```
+
+
+Let's take a look at the output of the MLE
+
+- Final value of the parameter ($\hat{\beta_0},\hat{\beta_1},\hat{\sigma}^2$)
+```{r}
+midwest.mle$par
+```
+
+- Final value of the log likelihood function
+
+```{r}
+midwest.mle$value
+```
+- Convergence (0 = successul completion)
+
+```{r}
+midwest.mle$convergence
+```
+
+
+### Comparing different methods of estimation
+
+The `lm` uses OLS approach (Ordinary Least Square) to calculate the model parameters, where the $\beta$ values can be be obtained by solving the normal equation: \[\hat{\mathbf{\beta}} = (X^TX)^{-1}X^Ty\]
+
+and $\sigma^2$ can be solved by plugging in the results of $\hat{\beta}$:
+
+\[\hat{\sigma}^2 = (y - \hat{y})^T(y-\hat{y})/(n-k)\]
+
+where $\hat{y} = X\hat{\beta}$ is the fitted value of $y$ after getting the OLS estiamtes of $\beta,$ and $k$ is the number of linear coefficients in the model ($k = 2$). Note that, in our example, the MLE and OLS estimates are extremely close, that is because they are theoretically the same thing under normality assumption. That is, when the MLE is derived from a normal density function, then it coincides with the estimates obtained by minimizing the sum of squared errors. Although, if the underlying distribution is not normal, then MLE $\not =$ OLS. 
+
+
+```{r}
+## beta 0 and beta 1:
+beta.hat = solve(t(x) %*% x) %*% (t(x) %*% y)
+
+err <- mhs.midwest$PRICE - midwest.fiitted
+sd.err <- sqrt(sum(err^2/(n-2)))
+
+
+results <-data.frame('method' = c('OLS','MLE'), 
+                     'beta0' = c(round(beta.hat[1],2),round(mle.coef[1],2)),
+                     'beta1' = c(round(beta.hat[2],2),round(mle.coef[2],2)),
+                     'sigma2' = c(round(sd.err,2), round(mle.coef[3],2)),
+                     'll_value' = c(logLik(midwest.lm),midwest.mle$value))
+
+results%>%
+  kable%>%
+  kable_styling("striped",position = 'center', full_width = FALSE)
+```
+
+### Summarize results in a plot
+
+```{r}
+
+plot(x=mhs.midwest$SQFT, y=mhs.midwest$PRICE,
+     xlab="SQFT",
+     ylab="PRICE",
+     col='darkgrey',
+     main = 'House values in midwest as a function of square footage')
+abline(a = results$beta0[1], b = results$beta1[1],col='forestgreen',lwd = 2)
+abline(a = results$beta0[2], b = results$beta1[2],col='red', lwd = 2)
+legend(1800, 100000, legend = c('data','LS estimate', 'MLE'),
+       col=c('darkgrey','forestgreen','red'), lty = c(1,1,1),cex=0.8,
+       title="Line types", text.font=4,bty = 'n',bg = 'transparent')
+```
+
+
+### Takeaway:
+
+- The quick-and-easy way of building a linear model usnig `lm`
+- The not-so-quick way of getting model parameters using MLE
+- Comparing parameter estimation methods (OLS vs MLE)
+

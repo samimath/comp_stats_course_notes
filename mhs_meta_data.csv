@@ -1,0 +1,51 @@
+﻿Variable Name,Variable Description,Values/ Format,Details,Notes
+CONTROL,Random ID # for home, YYMMNNNN,,
+REGION,"Region (dealer region if not placed; otherwise, placement region)","1,2,3,4,5",1= Northeast  ,"US level ""5"" only used for 3 or more section homes and homes with a Status of Non-res/Other (3)"
+,,,2=Midwest          ,
+,,,3=South                ,
+,,,4=West               ,
+,,,5=United States ,
+SHIPMONTH,Shipment month, YYYYMM," YYYY=year, MM=month",
+,,,,
+,,,,
+SECTIONS,Size of home ,"1,2,3",1= Single          ,
+,,,2=Double                    ,
+,,,3=3 or more sections,
+WEIGHT,Sample weight,XX.XXXX,Probability of selection/ # of sections,
+,,,,
+,,,,
+WGTADJ,Weight adjustment,XX.XXXX,Ratio adjustment of sample weight,Use for estimation of shipment totals
+STATUS,Status of home four months after shipment,"1,2,3",1= Intended for Sale for Residential Use   2=Placed/Sold for Residential Use   ,
+,,,3=Non-res/Other,
+PRICE,Sales price or intended sales price,"$XX,X00", Rounded to nearest $1000 (unless its topcoded and then rounded to nearest $100),Top and bottom 5% are coded to the average of those records to preserve distribution 
+,,,9 is for Nonapplicable cases,
+,,,,
+,,,,
+SQFT,Square footage of home,"X,X00", Rounded to nearest $100,Top and bottom 5% are coded to the average of those records to preserve distribution
+,,,9 is for Nonapplicable cases,
+,,,,
+,,,,
+BEDROOMS,Number of bedrooms,"1,3,9",1=  2 or less                    ,9 is for Nonapplicable cases or for disclosure purposes.
+,,,3= 3 or more,
+TITLED,How a home is titled,"1,2,3,9",1= Real Estate ,9 is for Nonapplicable cases or for disclosure purposes.
+,,,2= Personal Prop,
+,,,3= Not titled           ,
+LOCATION,Where a home is placed,"1,3,9",1 = Inside manuf. home communities ,9 is for Nonapplicable cases or for disclosure purposes.
+,,,3 = Outside manuf. home communities,
+,,,,
+,,,,
+FOUNDATION,"Type of foundation for home, if any.","1,2,3,9",1= Masonry/Concrete  ,9 is for Nonapplicable cases or for disclosure purposes.
+,,,2=Steel or Other  ,
+,,,3=Blocks,
+,,,,
+SECURED,How a home is secured (if not on permanent masonry/concrete),"1,3,9",1= Tie down straps or other                          ,9 is for Nonapplicable cases or for disclosure purposes.
+,,,3=Not secured,
+,,,,
+JSTATUS,Imputed indicator for status code,"R,I,9",R= Reported    I=Imputed, 9 is for disclosure purposes.
+JPRICE,Imputed indicator for price,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
+JSQFT,Imputed indicator for square feet,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
+JBEDROOM,Imputed indicator for bedrooms,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
+JTITLE,Imputed indicator for titled,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
+JLOCATION,Imputed indicator for location,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
+JFOUNDATION,Imputed indicator for foundation,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
+JSECURED,Imputed indicator for secured,"R,I,9",R= Reported    I=Imputed,9 is for Nonapplicable cases or for disclosure purposes.
