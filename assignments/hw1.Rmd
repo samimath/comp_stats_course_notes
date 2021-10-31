@@ -1,0 +1,77 @@
+---
+title: "Math 575 HW 1"
+subtitle: "Fall 2021"
+author: "Washington University in St. Louis, University College"
+date: "Due date: 9/26/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(kableExtra)
+```
+
+## Instruction:
+
+Please type your answers clearly and show your work neatly. You are encouraged to use the Rmarkdown version of this assignment as a template to submit your work. Unless stated otherwise, all programming references in the assignment will be in R. For this assignment, problems roughly covers content from the first 3 lectures, and chapters 1 and 2 of the text by Givens and Hoeting.
+
+
+### Problem 1 
+
+Let $X_1, X_2, ..., X_n$ be i.i.d. exponentially distributed random variables. That is, each $X_i$ has probability density function \[f_{X}(x) = \lambda e^{-\lambda x}, x>0. \] 
+
+a. Derive the log-likelihood function for $\lambda$ analytically.
+
+b. Check that the MLE you got from a) is indeed a maximum using the second-derivative test
+
+c. The data `claims.csv` is a sample of observations that measured the inter-arrival times between insurance claims from a fictional company. Consider each of the observations as a realization from an i.i.d. exponentially distributed random variable with unknown rate, $\lambda$. Let $\hat{\lambda}$ be the MLE of $\lambda$. Calculate the value of $\hat{\lambda}$ using the data.
+
+d. Use the R command `rexp()` to generate a set of exponentially distributed random variables with the $\hat{\lambda}$ you found from c, compare the quantile of the two datasets using `qqplot()`. Comment on the results.
+
+
+
+### Problem 2 (2.2. in book)
+
+Consider the density \[f(x) = \frac{1-\cos(x-\theta)}{2\pi}, 0 \leq x \leq 2\pi,\]where $\theta$ is a parameter between $-\pi$ and $\pi$. The following i.i.d. data arise from this density: 3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50. We wish to estimate $\theta$.
+
+a. Graph the log-likelihood function of $\theta$ between $-\pi$ and $\pi.$
+
+b. Find the method-of-moments estimator of $\theta$.
+
+c. Find the MLE for $\theta$ using the Newton-Raphson method, using the result from b) as the starting value. What solutions do you find when you start at -2.7 and 2.7?
+
+d. Repeat part (c) using 200 equally spaced starting values between $-\pi$ and $\pi.$ Partition the interval between $-\pi$ and $\pi$ into sets of attraction. In other words, divid the set of starting values into separate groups, with each group corresponding to a separate uniquee outcome of the optimization (a local mode). Discuss your results.
+
+
+
+
+
+### Problem 3 (2.6 in book)
+
+
+
+Table 1 below provides counts of a flour beetle (Tribolium confusum) population at various points in time. Beetles in all stages of development were counted, and the food supply was carefully controlled.
+An elementary model for population growth is the logistic model given by
+\[\frac{dN}{dt} = rN\large(1-\frac{N}{K}\large)\],
+  
+where N is population size, $t$ is time, $r$ is a growth rate parameter, and $K$ is a parameter that represents the population carrying capacity of the environment. The solution to this differential equation is given by
+ \[N_t = f(t) = \frac{kN_0}{N_0 + (K-N_0)\exp\{-rt\} } \]
+
+where $N_t$ denotes the population size at time $t$.
+
+```{r, echo=FALSE}
+Days = c(0,8,28,41,63,79,97,117,135,154)
+Beetles = c(2,47,192,256,768,896,1120,896,1184,1024)
+beetle.matrix <-matrix(rbind(Days,Beetles),nrow = 2)
+row.names(beetle.matrix) <-c('Days','Beetles')
+#kable(beetle.matrix)
+kbl(beetle.matrix,booktabs = T,align = 'c',caption = 'Beetle count')
+
+```
+
+a. Fit the logistic growth model to the flour beetle data using the Gauss–Newton approach to minimize the sum of squared errors between model predictions and observed counts.
+
+b. Fit the logistic growth model to the flour beetle data using the Newton–Raphson approach to minimize the sum of squared errors between model predictions and observed counts.
+
+
+

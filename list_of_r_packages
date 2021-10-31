@@ -1,0 +1,7 @@
+list of R packages used in the class so far:
+library('rmarkdown)
+library('readxl')
+library('rio')
+library('kableExtra')
+library('plot3D')
+library('latex2exp')

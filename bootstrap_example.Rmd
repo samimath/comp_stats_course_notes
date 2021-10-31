@@ -1,0 +1,190 @@
+---
+title: "Bootstrap example for linear moodel"
+#subtitle: "Math 575 lecture 2"
+author: "Sami Cheong"
+date: "10/26/2021"
+output: 
+  html_document:
+      toc: true
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library('readxl')
+library('ggplot2')
+library('kableExtra')
+
+```
+
+## Goal of this review 
+
+- Show a simple example of estimating uncertainty of a parameter through bootstrapping
+
+
+## Background about R package `boot`
+
+Note: The R package `boot` can perform a wide variety of bootstrapping techniques and is usually a simpler approach than directly programming a method. 
+
+## Data gathering and setting initial valuees
+
+In this example, we'll use the `alloy.dat` file provided by the author (Geof Givens and Jennifer Hoeting). The alloy data set measures the corrosion of a metal alloy as its iron content increases. Below is a figure that illustrates their relationship. (Note: to run this code you'll need to change the path where the data is on your local computer, the file is available on Canvas [link](https://wustl.instructure.com/courses/75710/files/3721195?module_item_id=1094912))
+
+
+
+```{r, fig.align='center'}
+
+alloy.dat <- read.table('datasets/alloy.dat',header = TRUE)
+z         <- alloy.dat
+plot(z$ironcontent,z$corrosionloss,xlab = 'Iron content', ylab = 'Corrosion loss')
+
+```
+
+Our goal here is to quantify the uncertainty of how changes in iron content will result in changes in corrosion loss. Consider the model, with `y` = corrosion loss, and `x` = iron content : \[y = \beta_0 + \beta_1 x + \epsilon\]
+
+and let $\theta = \beta_1/\beta_0$ to be our quantity of interest. 
+
+Let's define a few things:
+
+- `itr` :  the number of bootstrap iterations, i.e., the number of samples with replacement we'll draw from original dataset `z`.
+
+- `theta` : variable indicating the unknown parameter $\theta$ for the regression model.
+
+- `thetas` : a array to store parameter estimates from each bootstrap iteration.
+
+```{r}
+
+itr       = 10000
+theta     = NULL
+thetas    = rep(0,itr)
+set.seed(0)
+
+```
+
+Below we'll look at an example for bootstraping.
+
+*Bootstrap algorithm*
+
+
+1. draw bootstrap samples from $z$
+
+2. build a regression moodel for each set of pseudo data, $z^*$
+
+3. compute $\theta^*$ from each iteration
+
+```{r}
+
+
+model = lm(z[,2]~z[,1])
+theta = as.numeric(model$coefficients[2]/model$coefficients[1])
+for(i in 1:itr){
+      z.new = z[sample(1:length(z[,1]),replace=T),]
+      model = lm(z.new[,2]~z.new[,1])
+      thetas[i] = model$coefficients[2]/model$coefficients[1]
+}
+bias = mean(thetas)-theta
+
+## OUTPUT
+print(paste('OBSERVED DATA ESTIMATE: ' ,theta))
+print(paste('ESTIMATED BIAS: ' ,bias))
+print(paste('BIAS-CORRECTED ESTIMATE: ' ,theta-bias  ))
+```
+
+From the data above, we can see that there is about a 5% bias. Below is a histogram of the $\theta^*$ derived from each bootstrap sample.
+
+```{r}
+
+ci.95 = quantile(thetas,c(0.025,0.975),na.rm=T)
+```
+
+
+```{r}
+## PLOTS
+hist(thetas,breaks=40, 
+     main = 'bootstrap samples of theta by resampling from z',
+     xlim = c(-0.25,-0.15))
+abline(v = theta, col ='blue',lwd = 2)
+abline(v = ci.95[1], col ='red',lwd = 2,lty =2)
+abline(v = ci.95[2], col ='red',lwd = 2,lty =2)
+```
+
+
+### Bootstrap samples from residuals:
+
+
+1. Start by fitting the regression model to the observed data and obtaining the fitted responses $y_i$ and residuals $\epsilon_i$.
+
+2. Sample a bootstrap set of residuals ${\epsilon^*_1, ...,\epsilon^*_n}$ from the set of fitted residuals, completely at random with replacement.
+
+3. Create a bootstrap set of pseudo-responses. $y^*_i = \hat{y}_i + \epsilon^*_i$
+
+4. Regress $y^*$ on $x$ to obtain a bootstrap parameter estimate $\beta^*$
+
+5. Repeat this process many times to build an empirical distribution for $\beta^*$ that can be used for inference.
+
+```{r}
+iter <-10000
+model = lm(z[,2]~z[,1])
+theta = as.numeric(model$coefficients[2]/model$coefficients[1])
+thetas2    = rep(0,iter)
+err <- residuals(model)
+yhat <- fitted(model)
+
+for(i in 1:iter){
+  err.new <- err[sample(1:length(err),replace=T)]
+  y.new <- yhat + err.new
+  model <-lm(y.new ~ z[,1])
+  thetas2[i] = model$coefficients[2]/model$coefficients[1]
+  #print(thetas[i])
+  
+} 
+
+bias2 = mean(thetas2)-theta
+
+## OUTPUT
+print(paste('OBSERVED DATA ESTIMATE: ' ,theta))
+print(paste('ESTIMATED BIAS: ' ,bias2))
+print(paste('BIAS-CORRECTED ESTIMATE: ' ,theta-bias2  ))
+
+
+
+```
+
+
+
+```{r}
+
+ci2.95 = quantile(thetas2,c(0.025,0.975),na.rm=T)
+```
+
+
+
+```{r}
+## PLOTS
+hist(thetas2,breaks=40, 
+     main = 'bootstrap samples of theta by resampling from residuals',
+     xlim = c(-0.25,-0.15))
+abline(v = theta, col ='blue',lwd = 2)
+abline(v = ci2.95[1], col ='red',lwd = 2,lty =2)
+abline(v = ci2.95[2], col ='red',lwd = 2,lty =2)
+```
+
+
+
+### Takeaway from this example
+
+In this exercise, we compared two ways of building bootstrap estimates of a parameter derived a regression coefficients from a given data set. Below is a summary of comparison
+
+
+```{r,fig.align='center',fig.pos = "H"}
+bootstrap.type <-c('Bootstrap from data', 'Bootstrap from residuals')
+bias.percentage <- rbind(100*round(bias/theta,5),100*round(bias2/theta,5))
+lcf <-rbind(round(ci.95[1],2),round(ci2.95[1],2))
+hcf <-rbind(round(ci.95[2],2),round(ci2.95[2],2))
+result.summary <- data.frame(method = bootstrap.type,bias.perc = bias.percentage, lcf = lcf,hcf = hcf)
+names(result.summary) <-c('Bootstrap method','bias %', '2.5 quantile','97.5 quantile')
+kableExtra::kable(result.summary)%>%
+  kable_styling(htmltable_class = 'lightable-classic', bootstrap_options = 'responsive',
+                position = "left", font_size = 20,full_width = FALSE)
+
+```
