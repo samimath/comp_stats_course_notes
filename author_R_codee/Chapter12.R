@@ -1,6 +1,7 @@
 ############################################################################
 # COMPUTATIONAL STATISTICS
 # by Geof Givens and Jennifer Hoeting
+# modified by Sami Cheong to include interactive visualization using the plotly package
 # CHAPTER 12 EXAMPLES (last update 10/1/2012)
 
 ############################################################################
@@ -20,29 +21,44 @@
 ############################################################################
 
 ## INITIAL VALUES
-norwaypaper.dat = read.table(file.choose(),header=T)
+norwaypaper.dat = read.table('datasets/norwaypaper.dat',header = TRUE)
 y  = norwaypaper.dat$negy5
 x1 = norwaypaper.dat$x1
 x2 = norwaypaper.dat$x3
+new.data<-data.frame(y=y,x1=x1,x2=x2)
+library(additive)
 library(gam)    #you may need to install these packages
 library(akima)
 
+
+
+
 ## MAIN
 lmodel  = lm(y~x1+x2)
-gamodel = gam(y~s(x1)+s(x2),family="gaussian")
+gamodel <-additive(family = 'gaussian') %>%fit(y ~ s(x1) + s(x2) ,data = new.data)
+
 
 ## OUTPUT
 summary(lmodel)       # SUMMARY OF LINEAR MODEL FIT
-summary(gamodel)      # SUMMARY OF GAM FIT
+summary(gamodel$fit)      # SUMMARY OF GAM FIT
 
 ## OUTPUT PLOTS
 h.lm  = interp(x1,x2,fitted(lmodel))
-h.gam = interp(x1,x2,fitted(gamodel))
-par(mfrow=c(1,2))
-persp(h.lm,theta=30,phi=15,ticktype="detailed",expand=0.5,
-      xlab="x1",ylab="x2",zlab="y",main="Ordinary Linear Model")
-persp(h.gam,theta=30,phi=15,ticktype="detailed",expand=0.5,
-      xlab="x1",ylab="x2",zlab="y",main="Generalized Additive Model")
+h.gam = interp(x1,x2,fitted(gamodel$fit))
+#
+
+fig.lm <- plot_ly(x = h.lm$x, y = h.lm$y, z = h.lm$z) %>% add_surface() %>% layout(title = "Ordinary Linear Model")
+
+
+fig.gam <-plot_ly(x = h.gam$x, y = h.gam$y, z = h.gam$z) %>% add_surface()%>% layout(title = "Generalized Additive Model")
+
+
+fig <- subplot(fig.lm, fig.gam) 
+fig <- fig %>%
+  layout(title = "Comparisong of multivariate smoothing methods",
+         grid = list(rows = 1, columns = 2)
+
+fig
 
 
 ############################################################################
