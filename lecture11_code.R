@@ -131,6 +131,8 @@ ggplot(data = drugabuse.dat) + geom_density(aes(x=age, fill = as.factor(drugfree
 
 
 ## MAIN
+
+## Assuming response variable is binomial distributed
 gamodel.drug = gam(y~s(x1)+s(x2),family="binomial")
 
 ## OUTPUT

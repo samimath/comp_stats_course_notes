@@ -1,0 +1,609 @@
+---
+title: "Smooth spline estimator example"
+author: "Washington University in St. Louis, University College"
+date: "12/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## required packages
+library(car)
+library(mgcv)
+library(npreg)
+library(sm)
+```
+
+## 1.1 Motivation and Goals
+Multiple and generalized nonparametric regression models are powerful extensions of generalized linear models that can be used to estimate unknown functional relationships between a collection of predictors X1,…,Xp and an exponential family response variable Y. In R, several options exist for fitting such models. This document focuses on the gam function (in the mgcv package) and the gsm function (in the npreg package), both of which use a regression spline approach for the function estimation. This document provides examples that illustrate how to use the gam and gsm functions.
+
+1.2 `gam` (Generalized Additive Model) Function (mgcv Package)
+```
+Syntax:
+
+gam(formula,family=gaussian(),data=list(),weights=NULL,subset=NULL,
+        na.action,offset=NULL,method="GCV.Cp",
+        optimizer=c("outer","newton"),control=list(),scale=0,
+        select=FALSE,knots=NULL,sp=NULL,min.sp=NULL,H=NULL,gamma=1,
+        fit=TRUE,paraPen=NULL,G=NULL,in.out,drop.unused.
+```
+
+1.3 `gsm` (Generalized Smoothed Model) Function (npreg Package)
+
+```
+Syntax:
+
+gsm(formula, family = gaussian, data, weights, types = NULL, tprk = TRUE,
+        knots = NULL, update = TRUE, spar = NULL, lambda = NULL, control = list(),
+        method = c("GCV", "OCV", "GACV", "ACV", "PQL", "AIC", "BIC"))
+
+Or you could use the sm function for Gaussian data:
+
+sm(formula, data, weights, types = NULL, tprk = TRUE, knots = NULL,
+      update = TRUE, df, spar = NULL, lambda = NULL, control = list(),
+      method = c("GCV", "OCV", "GACV", "ACV", "REML", "ML", "AIC", "BIC"))
+The sm function has the benefit of more tuning methods and more efficient computational algorithms.
+```
+
+### 1.4 Comparison of Approaches
+
+#### Overview
+
+The gam and gsm functions differ in a variety of ways. Some key differences include:
+
+- The formula specification. The gam function uses specialized syntax, whereas the gsm function uses the standard formula syntax, e.g., as used in the lm and glm functions.
+
+*The types specification.* 
+
+The gam function requires the user to specify the smoother type within the formula specification via the arguments to the s function. The gsm function allows the user the input the smoother types separately via the types argument. Otherwise, the gsm function will infer the smoother type from the variable’s class, e.g., numeric class ↔ cubic spline, factor class ↔ nominal spline, and ordered class ↔ ordinal spline.
+
+*The knots specification.* 
+
+The gam function requires the user to specify the knots within the formula specification via the arguments to the s function. The gsm function allows the user the input the knots separately via the knots argument. Otherwise, the gsm function will use a random sample of knots.
+
+The gam function has more options avaiable for response variables, whereas the gsm function has more options avaiable for smoothing parameter selection.
+
+Both functions offer some similar smoothers (e.g., cubic smoothing splines), as well as some unique smoothers, e.g., soap film smoothers in the gam function or ordinal smoothers in the gsm function.
+
+## Example 1: Prestige by Income and Education (Gaussian)
+
+### Overview of Data
+
+The `Prestige` dataset (from the car package) contains the prestige of n=102 Canadian occupations from 1971, as well as the average income and education level of the occupation. We will use a multiple nonparametric regression model to model presitge as a function of income and education.
+
+First, let’s load the data and visualize the relationship between income (X1), education (X2), and prestige (Y).
+
+
+
+```{r}
+
+data(Prestige)
+head(Prestige)
+```
+
+
+
+```{r plot, echo=FALSE}
+# 3d scatterplot
+library(rgl)
+plot3d(prestige ~ income * education, data = Prestige,
+       col = ifelse(type == "prof", "red", "black"))
+rglwidget()
+```
+
+Note: the marginal relationship between prestige and income looks non-linear, whereas the marginal relationship between prestige and education looks mostly linear.
+
+### Analyses and Results: gam Function
+
+*Model Fitting*
+
+R code to fit additive and interaction models with `gam` function:
+
+```{r}
+
+# additive model (using default number of knots for each predictor)
+add.gam <- gam(prestige ~ s(income, bs = "cr") + s(education, bs = "cr"), 
+               data = Prestige)
+add.gam
+```
+
+#### Interaction model:
+
+```{r}
+# interaction model (using default number of knots for each predictor)
+int.gam <- gam(prestige ~ s(income, bs = "cr") + s(education, bs = "cr") 
+               + ti(income, education, bs = c("cr", "cr")), data = Prestige)
+int.gam
+```
+
+*Model Summary*
+
+R code to summarize the fit models:
+
+
+```{r}
+
+summary(add.gam)
+```
+
+
+```{r}
+
+# summarize interaction model
+summary(int.gam)
+```
+
+
+
+*Model Comparison*
+
+Compare additive and interaction models:
+
+
+```{r}
+
+
+# pseudo F test of interaction effect
+sse.dif <- add.gam$deviance - int.gam$deviance
+df.dif <- sum(int.gam$edf1) - sum(add.gam$edf1)
+Fstat <- (sse.dif / df.dif) / int.gam$sig2
+pvalue <- 1 - pf(Fstat, df1 = df.dif, df2 = nrow(Prestige) - sum(int.gam$edf))
+c(Fstat, pvalue)
+```
+
+
+
+```{r}
+
+# analysis of deviance table (gam)
+anova(add.gam, int.gam, test = "F")
+```
+
+*Plot Results*
+
+Plot results for additive model:
+
+
+```{r}
+
+# setup 1 x 2 subplots
+par(mfrow = c(1,2))
+
+# get predictor sequences
+xrng <- list(income = range(Prestige$income),
+             education = range(Prestige$education))
+inc.seq <- seq(xrng$income[1], xrng$income[2], length.out = 25)
+edu.seq <- seq(xrng$education[1], xrng$education[2], length.out = 25)
+
+# main effect of income
+newdata <- data.frame(income = inc.seq, education = mean(Prestige$education))
+yhat.inc <- predict(add.gam, newdata = newdata, se.fit = TRUE)
+plotci(inc.seq, yhat.inc$fit, yhat.inc$se.fit,
+       xlab = "Income", ylab = "Prestige",
+       main = "Income Effect")
+rug(Prestige$income)
+
+# main effect of education
+newdata <- data.frame(income = mean(Prestige$income), education = edu.seq)
+yhat.edu <- predict(add.gam, newdata = newdata, se.fit = TRUE)
+plotci(edu.seq, yhat.edu$fit, yhat.edu$se.fit,
+       xlab = "Education", ylab = "Prestige",
+       main = "Education Effect")
+rug(Prestige$education)
+```
+
+
+Plot results for interaction model:
+
+
+```{r}
+
+
+# setup 2 x 2 subplots
+par(mfrow = c(2,2))
+
+# quantiles of education
+labs <- c("Low", "Low-Med", "Med-High", "High")
+probs <- seq(0.2, 0.8, by = 0.2)
+qvals <- unname(quantile(Prestige$education, probs = probs))
+qvals
+```
+
+
+```{r}
+
+# plot prestige ~ income at different education levels
+for(j in 1:4){
+  newdata <- data.frame(income = inc.seq, education = qvals[j])
+  yhat <- predict(int.gam, newdata, se.fit = TRUE)
+  plotci(inc.seq, yhat$fit, yhat$se.fit, ylim = c(10, 110),
+         xlab = "Income", ylab = "Prestige",
+         main = paste0("Education = ", labs[j]))
+}
+```
+
+
+Surface plots for additive and interaction models:
+
+
+```{r}
+
+# get predictions (for visualization)
+inc.seq <- seq(xrng$income[1], xrng$income[2], length.out = 25)
+edu.seq <- seq(xrng$education[1], xrng$education[2], length.out = 25)
+newdata <- expand.grid(income = inc.seq, education = edu.seq)
+yhat.add <- predict(add.gam, newdata)
+yhat.int <- predict(int.gam, newdata)
+
+# plot results
+library(lattice)
+par(mfrow = c(1,2))
+persp(x = inc.seq, y = edu.seq, z = matrix(yhat.add, 25, 25),
+      theta = -45, phi = 30, xlab = "Income", ylab = "Education",
+      zlab = "Prestige", main = "Additive", zlim = c(10, 90))
+persp(x = inc.seq, y = edu.seq, z = matrix(yhat.int, 25, 25),
+      theta = -45, phi = 30, xlab = "Income", ylab = "Education",
+      zlab = "Prestige", main = "Interaction", zlim = c(10, 90))
+```
+
+
+### Analyses and Results: gsm Function
+
+*Model Fitting*
+
+R code to fit additive and interaction models with gsm function (using all n=102 data points as knots):
+
+
+```{r}
+
+# additive model (using all knots)
+add.gsm <- gsm(prestige ~ income + education, data = Prestige, knots = 102)
+add.gsm
+```
+
+
+```{r}
+
+# interaction model (using all knots)
+int.gsm <- gsm(prestige ~ income * education, data = Prestige, knots = 102)
+int.gsm
+
+```
+
+
+*Model Summary*
+
+R code to summarize the fit models:
+
+```{r}
+# summarize additive model
+summary(add.gsm)
+
+```
+
+
+
+```{r}
+# summarize interaction model
+summary(int.gsm)
+```
+
+
+*Model Comparison*
+
+Compare additive and interaction models:
+
+
+```{r}
+
+# pseudo F test of interaction effect
+sse.dif <- add.gsm$deviance - int.gsm$deviance
+df.dif <- int.gsm$df - add.gsm$df
+Fstat <- (sse.dif / df.dif) / int.gsm$dispersion
+pvalue <- 1 - pf(Fstat, df1 = df.dif, df2 = nrow(Prestige) - int.gsm$df)
+c(Fstat, pvalue)
+```
+
+
+*Plot Results*
+
+Plot results for additive model:
+
+
+```{r}
+
+# setup 1 x 2 subplots
+par(mfrow = c(1,2))
+
+# get predictor sequences
+xrng <- add.gsm$specs$xrng
+inc.seq <- seq(xrng$income[1], xrng$income[2], length.out = 25)
+edu.seq <- seq(xrng$education[1], xrng$education[2], length.out = 25)
+
+# main effect of income
+yhat.inc <- predict(add.gsm, newdata = data.frame(income = inc.seq),
+                    se.fit = TRUE, terms = "income")
+plotci(inc.seq, yhat.inc$fit, yhat.inc$se.fit,
+       xlab = "Income", ylab = "Prestige",
+       main = "Income Effect")
+rug(Prestige$income)
+
+# main effect of education
+yhat.edu <- predict(add.gsm, newdata = data.frame(education = edu.seq),
+                    se.fit = TRUE, terms = "education")
+plotci(edu.seq, yhat.edu$fit, yhat.edu$se.fit,
+       xlab = "Education", ylab = "Prestige",
+       main = "Education Effect")
+rug(Prestige$education)
+```
+
+
+
+Plot results for interaction model:
+
+```{r}
+# setup 2 x 2 subplots
+par(mfrow = c(2,2))
+
+# quantiles of education
+labs <- c("Low", "Low-Med", "Med-High", "High")
+probs <- seq(0.2, 0.8, by = 0.2)
+qvals <- unname(quantile(Prestige$education, probs = probs))
+qvals
+```
+
+
+
+## Example 2: Titanic survival by age and sex 
+
+### Overview of the data
+
+The `TitanicSurvival` dataset (from the car package) contains survival and demographic information for n=1309 passengers on the Titanic. We will use a nonparametric logistic regression model to model the probability of survial as a function of age and sex.
+
+First, let’s load the data and visualize the relationship between age (X1), sex (X2), and survival (Y).
+
+
+```{r}
+data(TitanicSurvival)
+head(TitanicSurvival)
+
+```
+
+
+
+```{r}
+# plot survived ~ age * sex
+y <- ifelse(TitanicSurvival$survived == "yes", 1, 0)
+plot(TitanicSurvival$age, y,
+     xlab = "Age (Years)", ylab = "Survived (1 = Yes)",
+     pch = ifelse(TitanicSurvival$sex == "male", 16, 17),
+     col = ifelse(TitanicSurvival$sex == "male", "blue", "red"))
+legend("right", c("female", "male"), pch = c(17, 16),
+       col = c("red", "blue"), bty = "n")
+
+
+```
+
+
+### Analyses and Results: gam Function
+
+
+#### Model Fitting
+
+R code to fit additive and interaction models with gam function:
+
+
+```{r}
+
+# additive model
+add.gam <- gam(y ~ sex + s(age, bs = "cr"), 
+               family = binomial, data = TitanicSurvival)
+add.gam
+```
+
+
+
+```{r}
+
+# interaction model
+int.gam <- gam(y ~ sex + s(age, bs = "cr", by = sex), 
+               family = binomial, data = TitanicSurvival)
+int.gam
+
+```
+
+
+
+#### Model Summary
+
+R code to summarize the fit models:
+
+
+```{r}
+
+# summarize additive model
+summary(add.gam)
+
+```
+
+
+
+```{r}
+
+# summarize interaction model
+summary(int.gam)
+```
+
+
+#### Model Comparison
+
+Compare additive and interaction models:
+
+
+```{r}
+
+# pseudo Chisq test of interaction effect
+sse.dif <- add.gam$deviance - int.gam$deviance
+df.dif <- sum(int.gam$edf1) - sum(add.gam$edf1)
+pvalue <- 1 - pchisq(sse.dif, df = df.dif)
+c(sse.dif, pvalue)
+```
+
+
+
+```{r}
+# analysis of deviance table (gam)
+anova(add.gam, int.gam, test = "Chisq")
+```
+
+
+#### Plot Results
+
+Plot results for additive and interaction models:
+
+
+```{r}
+# get predictions (for visualization)
+xrng <- list(age = range(TitanicSurvival$age, na.rm = TRUE))
+age.seq <- seq(xrng$age[1], xrng$age[2], length.out = 25)
+sex.seq <- c("female", "male")
+newdata <- expand.grid(age = age.seq, sex = sex.seq)
+yhat.add <- predict(add.gam, newdata, type = "response")
+yhat.int <- predict(int.gam, newdata, type = "response")
+
+# additive model
+par(mfrow = c(1,2))
+plot(age.seq, yhat.add[1:25], ylim = c(0, 1), t = "l", col = "red",
+     xlab = "Age (Years)", ylab = "Probability of Survival",
+     main = "Additive Model")
+lines(age.seq, yhat.add[1:25 + 25], lty = 2, col = "blue")
+legend("bottomleft", legend = c("female", "male"), lty = 1:2,
+       col = c("red", "blue"), horiz = TRUE, bty = "n")
+
+# interaction model
+plot(age.seq, yhat.int[1:25], ylim = c(0, 1), t = "l", col = "red",
+     xlab = "Age (Years)", ylab = "Probability of Survival",
+     main = "Interaction Model")
+lines(age.seq, yhat.int[1:25 + 25], lty = 2, col = "blue")
+legend("bottomleft", legend = c("female", "male"), lty = 1:2,
+       col = c("red", "blue"), horiz = TRUE, bty = "n")
+
+```
+
+
+
+### Analyses and Results: gsm Function
+
+
+####Model Fitting
+
+R code to fit additive and interaction models with gsm function:
+
+
+```{r}
+
+# select knots (age quantiles by sex)
+probs <- seq(0, 1, length.out = 9)
+knots <- with(TitanicSurvival, tapply(age, sex, quantile, probs = probs, na.rm = T))
+knots <- list(age = unlist(knots), sex = rep(c("female", "male"), each = 9))
+#knots <- list(age = quantile(TitanicSurvival$age, probs = probs, na.rm = TRUE),
+#              sex = c("female", "male"))
+
+# additive model
+add.gsm <- gsm(y ~ age + sex, family = binomial,
+               data = TitanicSurvival, knots = knots)
+add.gsm
+```
+
+
+
+```{r}
+
+# interaction model
+int.gsm <- gsm(y ~ age * sex, family = binomial,
+               data = TitanicSurvival, knots = knots)
+int.gsm
+```
+
+
+
+####Model Summary
+
+R code to summarize the fit models:
+
+```{r}
+
+# summarize additive model
+summary(add.gsm)
+```
+
+
+
+
+```{r}
+# summarize interaction model
+summary(int.gsm)
+```
+
+
+####Model Comparison
+
+Compare additive and interaction models:
+
+```{r}
+
+# pseudo Chisq test of interaction effect
+sse.dif <- add.gsm$deviance - int.gsm$deviance
+df.dif <- int.gsm$df - add.gsm$df
+pvalue <- 1 - pchisq(sse.dif, df = df.dif)
+```
+
+
+```{r}
+
+c(sse.dif, pvalue)
+```
+
+
+
+```{r}
+# df.dif is negative, so set df.dif = 1
+pvalue <- 1 - pchisq(sse.dif, df = 1)
+c(sse.dif, pvalue)
+
+```
+
+
+####Plot Results
+
+Plot results for additive and interaction models:
+
+
+```{r}
+
+# get predictions (for visualization)
+xrng <- add.gsm$specs$xrng
+age.seq <- seq(xrng$age[1], xrng$age[2], length.out = 25)
+sex.seq <- c("female", "male")
+newdata <- expand.grid(age = age.seq, sex = sex.seq)
+yhat.add <- predict(add.gsm, newdata, type = "response")
+yhat.int <- predict(int.gsm, newdata, type = "response")
+
+# additive model
+par(mfrow = c(1,2))
+plot(age.seq, yhat.add[1:25], ylim = c(0, 1), t = "l", col = "red",
+     xlab = "Age (Years)", ylab = "Probability of Survival",
+     main = "Additive Model")
+lines(age.seq, yhat.add[1:25 + 25], lty = 2, col = "blue")
+legend("bottomleft", legend = c("female", "male"), lty = 1:2,
+       col = c("red", "blue"), horiz = TRUE, bty = "n")
+
+# interaction model
+plot(age.seq, yhat.int[1:25], ylim = c(0, 1), t = "l", col = "red",
+     xlab = "Age (Years)", ylab = "Probability of Survival",
+     main = "Interaction Model")
+lines(age.seq, yhat.int[1:25 + 25], lty = 2, col = "blue")
+legend("bottomleft", legend = c("female", "male"), lty = 1:2,
+       col = c("red", "blue"), horiz = TRUE, bty = "n")
+```
